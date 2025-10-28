@@ -29,8 +29,12 @@ def get_db_connection():
 
 def rewrite_with_yandex(title: str, description: str) -> Dict[str, str]:
     api_key = os.environ.get('YANDEX_API_KEY')
+    folder_id = os.environ.get('YANDEX_FOLDER_ID')
+    
     if not api_key:
         raise ValueError('YANDEX_API_KEY not found in environment')
+    if not folder_id:
+        raise ValueError('YANDEX_FOLDER_ID not found in environment')
     
     prompt = f"""Перепиши эту новость уникально, сохранив смысл и факты. Сделай SEO-оптимизированный заголовок и описание.
 
@@ -42,7 +46,7 @@ def rewrite_with_yandex(title: str, description: str) -> Dict[str, str]:
 {{"title": "новый заголовок", "description": "новое описание (2-3 предложения)"}}"""
     
     data = json.dumps({
-        'modelUri': 'gpt://b1gk8pu48v5pnqs2ijnm/yandexgpt-lite',
+        'modelUri': f'gpt://{folder_id}/yandexgpt-lite',
         'completionOptions': {
             'stream': False,
             'temperature': 0.7,
