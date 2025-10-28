@@ -32,6 +32,8 @@ def rewrite_with_yandex(title: str, description: str) -> Dict[str, str]:
     api_key = os.environ.get('YANDEX_API_KEY')
     folder_id = os.environ.get('YANDEX_FOLDER_ID')
     
+    print(f"DEBUG: API key exists: {bool(api_key)}, Folder ID: {folder_id}")
+    
     if not api_key:
         raise ValueError('YANDEX_API_KEY not found in environment')
     if not folder_id:
@@ -68,10 +70,17 @@ def rewrite_with_yandex(title: str, description: str) -> Dict[str, str]:
         }
     )
     
-    with urllib.request.urlopen(req, timeout=30) as response:
-        result = json.loads(response.read().decode('utf-8'))
-        text = result['result']['alternatives'][0]['message']['text']
-        return json.loads(text)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            text = result['result']['alternatives'][0]['message']['text']
+            return json.loads(text)
+    except Exception as e:
+        if hasattr(e, 'read'):
+            error_body = e.read().decode('utf-8')
+            print(f"YandexGPT API Error: {error_body}")
+        print(f"Full error: {str(e)}")
+        raise
 
 def fetch_and_save_news(category: str, feed_url: str, limit: int = 5) -> int:
     feed = feedparser.parse(feed_url)
