@@ -3,6 +3,7 @@ Business: Fetch RSS feeds, rewrite news using YandexGPT, save to database
 Args: event - dict with httpMethod ('GET' to fetch, 'POST' to trigger update)
       context - object with request_id, function_name attributes
 Returns: HTTP response with fetched/updated news
+Updated: 2025-10-28 with Yandex secrets support
 """
 
 import json
