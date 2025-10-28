@@ -12,7 +12,8 @@ from datetime import datetime
 from typing import Dict, Any, List
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from openai import OpenAI
+import urllib.request
+import urllib.parse
 
 RSS_FEEDS = {
     'Политика': 'https://tass.ru/rss/v2.xml',
@@ -31,8 +32,6 @@ def rewrite_with_openai(title: str, description: str) -> Dict[str, str]:
     if not api_key:
         raise ValueError('OPENAI_API_KEY not found in environment')
     
-    client = OpenAI(api_key=api_key)
-    
     prompt = f"""Перепиши эту новость уникально, сохранив смысл и факты. Сделай SEO-оптимизированный заголовок и описание.
 
 Оригинал:
@@ -42,13 +41,24 @@ def rewrite_with_openai(title: str, description: str) -> Dict[str, str]:
 Верни JSON:
 {{"title": "новый заголовок", "description": "новое описание (2-3 предложения)"}}"""
     
-    response = client.chat.completions.create(
-        model='gpt-4o-mini',
-        messages=[{'role': 'user', 'content': prompt}],
-        response_format={'type': 'json_object'}
+    data = json.dumps({
+        'model': 'gpt-4o-mini',
+        'messages': [{'role': 'user', 'content': prompt}],
+        'response_format': {'type': 'json_object'}
+    }).encode('utf-8')
+    
+    req = urllib.request.Request(
+        'https://api.openai.com/v1/chat/completions',
+        data=data,
+        headers={
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
     )
     
-    return json.loads(response.choices[0].message.content)
+    with urllib.request.urlopen(req, timeout=30) as response:
+        result = json.loads(response.read().decode('utf-8'))
+        return json.loads(result['choices'][0]['message']['content'])
 
 def fetch_and_save_news(category: str, feed_url: str, limit: int = 5) -> int:
     feed = feedparser.parse(feed_url)
