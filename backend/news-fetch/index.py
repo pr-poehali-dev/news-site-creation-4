@@ -1,9 +1,8 @@
 """
-Business: Fetch RSS feeds, rewrite news using YandexGPT, save to database
+Business: Fetch RSS feeds and save original news to database
 Args: event - dict with httpMethod ('GET' to fetch, 'POST' to trigger update)
       context - object with request_id, function_name attributes
 Returns: HTTP response with fetched/updated news
-Updated: 2025-10-28 with Yandex secrets (redeployed)
 """
 
 import json
@@ -104,14 +103,12 @@ def fetch_and_save_news(category: str, feed_url: str, limit: int = 5) -> int:
             continue
         
         try:
-            rewritten = rewrite_with_yandex(original_title, original_description)
-            
             cursor.execute("""
                 INSERT INTO news (title, description, category, source_url, original_title, is_published)
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, (
-                rewritten['title'],
-                rewritten['description'],
+                original_title,
+                original_description,
                 category,
                 source_url,
                 original_title,
@@ -121,7 +118,7 @@ def fetch_and_save_news(category: str, feed_url: str, limit: int = 5) -> int:
             saved_count += 1
         except Exception as e:
             conn.rollback()
-            print(f"Error rewriting news: {e}")
+            print(f"Error saving news: {e}")
             continue
     
     cursor.close()
