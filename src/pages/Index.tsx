@@ -1,81 +1,96 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import NewsHeader from '../components/NewsHeader';
 import NewsCard from '../components/NewsCard';
+import { Button } from '@/components/ui/button';
+import Icon from '@/components/ui/icon';
+import { useToast } from '@/hooks/use-toast';
 
-const newsData = [
-  {
-    id: 1,
-    title: 'Новые технологии меняют мир: ИИ достигает невероятных высот',
-    description: 'Искусственный интеллект продолжает развиваться семимильными шагами. Эксперты прогнозируют революционные изменения во всех сферах жизни в ближайшие годы.',
-    category: 'Технологии',
-    date: '2 часа назад',
-    imageUrl: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&h=600&fit=crop',
-    isMain: true,
-  },
-  {
-    id: 2,
-    title: 'Экономический форум обсудил будущее мировой торговли',
-    description: 'На международном экономическом форуме лидеры стран договорились о новых правилах торговли.',
-    category: 'Экономика',
-    date: '3 часа назад',
-    imageUrl: 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=800&h=600&fit=crop',
-  },
-  {
-    id: 3,
-    title: 'Сборная России одержала уверенную победу',
-    description: 'Российские спортсмены показали отличную игру и выиграли с крупным счетом.',
-    category: 'Спорт',
-    date: '4 часа назад',
-    videoUrl: '/placeholder-video.mp4',
-  },
-  {
-    id: 4,
-    title: 'Премьера долгожданного фильма собрала рекордные сборы',
-    description: 'Новый блокбастер побил все рекорды кассовых сборов в первые выходные проката.',
-    category: 'Культура',
-    date: '5 часов назад',
-    imageUrl: 'https://images.unsplash.com/photo-1574267432644-f737b7a0ea8b?w=800&h=600&fit=crop',
-  },
-  {
-    id: 5,
-    title: 'Важные политические переговоры завершились успешно',
-    description: 'Стороны достигли консенсуса по ключевым вопросам международного сотрудничества.',
-    category: 'Политика',
-    date: '6 часов назад',
-    imageUrl: 'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=800&h=600&fit=crop',
-  },
-  {
-    id: 6,
-    title: 'Новый стартап привлек $50 млн инвестиций',
-    description: 'Молодая технологическая компания получила крупное финансирование для развития.',
-    category: 'Экономика',
-    date: '7 часов назад',
-    imageUrl: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=800&h=600&fit=crop',
-  },
-  {
-    id: 7,
-    title: 'Олимпийский чемпион установил новый мировой рекорд',
-    description: 'Выдающееся достижение атлета войдет в историю мирового спорта.',
-    category: 'Спорт',
-    date: '8 часов назад',
-    imageUrl: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=800&h=600&fit=crop',
-  },
-  {
-    id: 8,
-    title: 'Квантовый компьютер решил сложнейшую задачу',
-    description: 'Ученые совершили прорыв в области квантовых вычислений.',
-    category: 'Технологии',
-    date: '9 часов назад',
-    videoUrl: '/placeholder-video.mp4',
-  },
-];
+const API_URL = 'https://functions.poehali.dev/f6dff293-0616-4467-8e83-100d280718ec';
+
+interface NewsItem {
+  id: number;
+  title: string;
+  description: string;
+  category: string;
+  image_url?: string;
+  video_url?: string;
+  published_at: string;
+  source_url?: string;
+}
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  
+  if (diffHours < 1) return 'только что';
+  if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'час' : diffHours < 5 ? 'часа' : 'часов'} назад`;
+  
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return 'вчера';
+  if (diffDays < 7) return `${diffDays} ${diffDays < 5 ? 'дня' : 'дней'} назад`;
+  
+  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+}
 
 const Index = () => {
   const [activeCategory, setActiveCategory] = useState('Главная');
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const { toast } = useToast();
 
-  const filteredNews = activeCategory === 'Главная' 
-    ? newsData 
-    : newsData.filter(news => news.category === activeCategory);
+  const fetchNews = async (category?: string) => {
+    setLoading(true);
+    try {
+      const url = category && category !== 'Главная' 
+        ? `${API_URL}?category=${encodeURIComponent(category)}&limit=20`
+        : `${API_URL}?limit=20`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      setNews(data);
+    } catch (error) {
+      toast({
+        title: 'Ошибка загрузки',
+        description: 'Не удалось загрузить новости',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateNews = async () => {
+    setUpdating(true);
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const result = await response.json();
+      
+      toast({
+        title: 'Новости обновлены!',
+        description: result.message,
+      });
+      
+      await fetchNews(activeCategory);
+    } catch (error) {
+      toast({
+        title: 'Ошибка обновления',
+        description: 'Не удалось обновить новости',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNews(activeCategory);
+  }, [activeCategory]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -85,29 +100,55 @@ const Index = () => {
       />
 
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-8 animate-fade-in">
-          <h2 className="text-4xl font-bold mb-2">
-            {activeCategory === 'Главная' ? 'Главные новости' : activeCategory}
-          </h2>
-          <p className="text-muted-foreground">
-            Самые актуальные события и происшествия
-          </p>
+        <div className="mb-8 animate-fade-in flex items-center justify-between">
+          <div>
+            <h2 className="text-4xl font-bold mb-2">
+              {activeCategory === 'Главная' ? 'Главные новости' : activeCategory}
+            </h2>
+            <p className="text-muted-foreground">
+              Уникальные новости с автоматическим рерайтом
+            </p>
+          </div>
+          <Button
+            onClick={updateNews}
+            disabled={updating}
+            className="gap-2"
+            size="lg"
+          >
+            <Icon name={updating ? 'Loader2' : 'RefreshCw'} size={18} className={updating ? 'animate-spin' : ''} />
+            {updating ? 'Обновляем...' : 'Обновить новости'}
+          </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-scale-in">
-          {filteredNews.map((news) => (
-            <NewsCard
-              key={news.id}
-              title={news.title}
-              description={news.description}
-              category={news.category}
-              imageUrl={news.imageUrl}
-              videoUrl={news.videoUrl}
-              date={news.date}
-              isMain={news.isMain}
-            />
-          ))}
-        </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Icon name="Loader2" size={48} className="animate-spin text-primary" />
+          </div>
+        ) : news.length === 0 ? (
+          <div className="text-center py-20">
+            <Icon name="Newspaper" size={64} className="mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-2xl font-bold mb-2">Новостей пока нет</h3>
+            <p className="text-muted-foreground mb-6">Нажмите «Обновить новости» чтобы загрузить свежие статьи</p>
+            <Button onClick={updateNews} disabled={updating}>
+              Загрузить новости
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-scale-in">
+            {news.map((item, index) => (
+              <NewsCard
+                key={item.id}
+                title={item.title}
+                description={item.description}
+                category={item.category}
+                imageUrl={item.image_url}
+                videoUrl={item.video_url}
+                date={formatDate(item.published_at)}
+                isMain={index === 0}
+              />
+            ))}
+          </div>
+        )}
       </main>
 
       <footer className="bg-white border-t mt-16 py-8">
