@@ -1,5 +1,5 @@
 """
-Business: Fetch RSS feeds, rewrite news using OpenAI, save to database
+Business: Fetch RSS feeds, rewrite news using YandexGPT, save to database
 Args: event - dict with httpMethod ('GET' to fetch, 'POST' to trigger update)
       context - object with request_id, function_name attributes
 Returns: HTTP response with fetched/updated news
@@ -27,10 +27,10 @@ def get_db_connection():
     database_url = os.environ.get('DATABASE_URL')
     return psycopg2.connect(database_url)
 
-def rewrite_with_openai(title: str, description: str) -> Dict[str, str]:
-    api_key = os.environ.get('OPENAI_API_KEY')
+def rewrite_with_yandex(title: str, description: str) -> Dict[str, str]:
+    api_key = os.environ.get('YANDEX_API_KEY')
     if not api_key:
-        raise ValueError('OPENAI_API_KEY not found in environment')
+        raise ValueError('YANDEX_API_KEY not found in environment')
     
     prompt = f"""Перепиши эту новость уникально, сохранив смысл и факты. Сделай SEO-оптимизированный заголовок и описание.
 
@@ -38,27 +38,35 @@ def rewrite_with_openai(title: str, description: str) -> Dict[str, str]:
 Заголовок: {title}
 Описание: {description}
 
-Верни JSON:
+Верни только JSON без дополнительного текста:
 {{"title": "новый заголовок", "description": "новое описание (2-3 предложения)"}}"""
     
     data = json.dumps({
-        'model': 'gpt-4o-mini',
-        'messages': [{'role': 'user', 'content': prompt}],
-        'response_format': {'type': 'json_object'}
+        'modelUri': 'gpt://b1gk8pu48v5pnqs2ijnm/yandexgpt-lite',
+        'completionOptions': {
+            'stream': False,
+            'temperature': 0.7,
+            'maxTokens': 500
+        },
+        'messages': [
+            {'role': 'system', 'text': 'Ты профессиональный редактор новостей. Отвечай только в формате JSON.'},
+            {'role': 'user', 'text': prompt}
+        ]
     }).encode('utf-8')
     
     req = urllib.request.Request(
-        'https://api.openai.com/v1/chat/completions',
+        'https://llm.api.cloud.yandex.net/foundationModels/v1/completion',
         data=data,
         headers={
-            'Authorization': f'Bearer {api_key}',
+            'Authorization': f'Api-Key {api_key}',
             'Content-Type': 'application/json'
         }
     )
     
     with urllib.request.urlopen(req, timeout=30) as response:
         result = json.loads(response.read().decode('utf-8'))
-        return json.loads(result['choices'][0]['message']['content'])
+        text = result['result']['alternatives'][0]['message']['text']
+        return json.loads(text)
 
 def fetch_and_save_news(category: str, feed_url: str, limit: int = 5) -> int:
     feed = feedparser.parse(feed_url)
@@ -82,7 +90,7 @@ def fetch_and_save_news(category: str, feed_url: str, limit: int = 5) -> int:
             continue
         
         try:
-            rewritten = rewrite_with_openai(original_title, original_description)
+            rewritten = rewrite_with_yandex(original_title, original_description)
             
             cursor.execute("""
                 INSERT INTO news (title, description, category, source_url, original_title, is_published)
