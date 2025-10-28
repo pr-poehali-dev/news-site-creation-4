@@ -31,11 +31,7 @@ def rewrite_with_openai(title: str, description: str) -> Dict[str, str]:
     if not api_key:
         raise ValueError('OPENAI_API_KEY not found in environment')
     
-    client = OpenAI(
-        api_key=api_key,
-        max_retries=2,
-        timeout=30.0
-    )
+    client = OpenAI(api_key=api_key)
     
     prompt = f"""Перепиши эту новость уникально, сохранив смысл и факты. Сделай SEO-оптимизированный заголовок и описание.
 
